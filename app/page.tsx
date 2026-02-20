@@ -346,6 +346,16 @@ function getDefaultDateRange(): { from: string; to: string } {
   return { from: toYMD(weekAgo), to: toYMD(now) }
 }
 
+function isValidArxivLink(url: string): boolean {
+  if (!url || typeof url !== 'string') return false
+  // Real ArXiv links follow patterns like:
+  // https://arxiv.org/abs/2401.12345
+  // http://arxiv.org/abs/2401.12345v2
+  // https://arxiv.org/pdf/2401.12345
+  const arxivPattern = /^https?:\/\/arxiv\.org\/(abs|pdf)\/\d{4}\.\d{4,5}(v\d+)?$/
+  return arxivPattern.test(url.trim())
+}
+
 const DATE_RANGE_PRESETS: { label: string; days: number }[] = [
   { label: 'Last 7 days', days: 7 },
   { label: 'Last 14 days', days: 14 },
@@ -618,6 +628,7 @@ function TopicCard({ topic, onRemove }: { topic: ResearchTopic; onRemove: (id: s
 
 function PaperCard({ paper }: { paper: PaperData }) {
   const [expanded, setExpanded] = useState(false)
+  const hasValidLink = isValidArxivLink(paper?.arxiv_link ?? '')
 
   return (
     <GlassCard className="hover:shadow-md transition-all duration-200">
@@ -629,7 +640,7 @@ function PaperCard({ paper }: { paper: PaperData }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
               <h4 className="font-semibold text-sm text-foreground leading-snug">{paper?.title ?? 'Untitled'}</h4>
-              {paper?.arxiv_link && (
+              {paper?.arxiv_link && hasValidLink ? (
                 <a
                   href={paper.arxiv_link}
                   target="_blank"
@@ -638,7 +649,14 @@ function PaperCard({ paper }: { paper: PaperData }) {
                 >
                   <HiArrowTopRightOnSquare className="w-3.5 h-3.5" />
                 </a>
-              )}
+              ) : paper?.arxiv_link ? (
+                <div
+                  className="flex-shrink-0 w-7 h-7 rounded-lg bg-amber-100/50 flex items-center justify-center text-amber-600 cursor-not-allowed"
+                  title="Link could not be verified"
+                >
+                  <HiExclamationTriangle className="w-3.5 h-3.5" />
+                </div>
+              ) : null}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {paper?.authors ?? 'Unknown authors'} {paper?.published_date ? `| ${formatDate(paper.published_date)}` : ''}
