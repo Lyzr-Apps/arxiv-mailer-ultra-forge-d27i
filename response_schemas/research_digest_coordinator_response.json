@@ -1,0 +1,58 @@
+{
+  "agent_name": "Research Digest Coordinator",
+  "agent_id": "6997b86c249b5b042152423e",
+  "description": "Coordinates the weekly research workflow \u2014 collects user topics, dispatches to ArXiv sub-agent for paper retrieval, passes results to email sub-agent for digest composition and delivery, aggregates final status",
+  "agent_type": "json",
+  "accessor": "result",
+  "auto_generated": true,
+  "response_schema": {
+    "status": "string",
+    "topics_processed": "number",
+    "total_papers": "number",
+    "email_status": "string",
+    "digest_preview": "string",
+    "papers_by_topic": [
+      {
+        "topic_name": "string",
+        "paper_count": "number",
+        "papers": [
+          {
+            "title": "string",
+            "authors": "string",
+            "published_date": "string",
+            "arxiv_link": "string",
+            "summary": "string",
+            "key_insights": [
+              "string"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "example_response": {
+    "status": "sample string",
+    "topics_processed": 0,
+    "total_papers": 0,
+    "email_status": "sample string",
+    "digest_preview": "sample string",
+    "papers_by_topic": [
+      {
+        "topic_name": "sample string",
+        "paper_count": 0,
+        "papers": [
+          {
+            "title": "sample string",
+            "authors": "sample string",
+            "published_date": "sample string",
+            "arxiv_link": "sample string",
+            "summary": "sample string",
+            "key_insights": [
+              "sample string"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

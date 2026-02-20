@@ -1,0 +1,44 @@
+{
+  "agents": {
+    "arxiv_research_agent": {
+      "agent_id": "6997b858c00585daae144d9a",
+      "name": "ArXiv Research Agent",
+      "type": "sub-agent",
+      "model": "gpt-4.1",
+      "provider": "openai",
+      "tools": ["ARXIV__SEARCH_PAPERS", "ARXIV__GET_PAPER_METADATA"],
+      "tool_source": "aci"
+    },
+    "email_composer_agent": {
+      "agent_id": "6997b859249b5b042152423c",
+      "name": "Email Composer Agent",
+      "type": "sub-agent",
+      "model": "gpt-4.1",
+      "provider": "openai",
+      "tools": ["GMAIL_SEND_EMAIL"],
+      "tool_source": "composio"
+    },
+    "research_digest_coordinator": {
+      "agent_id": "6997b86c249b5b042152423e",
+      "name": "Research Digest Coordinator",
+      "type": "manager",
+      "model": "gpt-4.1",
+      "provider": "openai",
+      "managed_agents": [
+        "6997b858c00585daae144d9a",
+        "6997b859249b5b042152423c"
+      ]
+    }
+  },
+  "schedule": {
+    "schedule_id": "6997b872399dfadeac37c0a7",
+    "agent_id": "6997b86c249b5b042152423e",
+    "cron_expression": "0 8 * * 1",
+    "timezone": "Asia/Kolkata",
+    "description": "Every Monday at 8:00 AM IST",
+    "next_run": "2026-02-23T08:00:00+05:30",
+    "is_active": true,
+    "max_retries": 2,
+    "retry_delay": 300
+  }
+}

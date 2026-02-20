@@ -1,0 +1,64 @@
+{
+  "nodes": [
+    {
+      "id": "input_node",
+      "type": "Input",
+      "label": "User Topics / Schedule Trigger",
+      "nodeCategory": "input"
+    },
+    {
+      "id": "manager_agent",
+      "type": "Agent",
+      "label": "Research Digest Coordinator",
+      "nodeCategory": "agent",
+      "agent_id": "6997b86c249b5b042152423e",
+      "agent_type": "manager",
+      "model": "gpt-4.1",
+      "provider": "openai"
+    },
+    {
+      "id": "arxiv_agent",
+      "type": "Agent",
+      "label": "ArXiv Research Agent",
+      "nodeCategory": "agent",
+      "agent_id": "6997b858c00585daae144d9a",
+      "agent_type": "sub-agent",
+      "model": "gpt-4.1",
+      "provider": "openai"
+    },
+    {
+      "id": "email_agent",
+      "type": "Agent",
+      "label": "Email Composer Agent",
+      "nodeCategory": "agent",
+      "agent_id": "6997b859249b5b042152423c",
+      "agent_type": "sub-agent",
+      "model": "gpt-4.1",
+      "provider": "openai"
+    },
+    {
+      "id": "output_node",
+      "type": "Output",
+      "label": "Digest Output",
+      "nodeCategory": "end"
+    }
+  ],
+  "edges": [
+    {
+      "source": "input_node",
+      "target": "manager_agent"
+    },
+    {
+      "source": "manager_agent",
+      "target": "arxiv_agent"
+    },
+    {
+      "source": "manager_agent",
+      "target": "email_agent"
+    },
+    {
+      "source": "email_agent",
+      "target": "output_node"
+    }
+  ]
+}
