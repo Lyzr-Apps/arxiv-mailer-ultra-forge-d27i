@@ -10,6 +10,7 @@
     "topics_processed": "number",
     "total_papers": "number",
     "email_status": "string",
+    "date_range": "string",
     "digest_preview": "string",
     "papers_by_topic": [
       {
@@ -35,6 +36,7 @@
     "topics_processed": 0,
     "total_papers": 0,
     "email_status": "sample string",
+    "date_range": "2026-02-13 to 2026-02-20",
     "digest_preview": "sample string",
     "papers_by_topic": [
       {

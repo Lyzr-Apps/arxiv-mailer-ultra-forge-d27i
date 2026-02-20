@@ -97,7 +97,7 @@ interface DigestEntry {
   totalPapers: number
   emailStatus: string
   digestPreview: string
-  previewOnly: boolean
+  dateRange: string
   papersByTopic: TopicPapers[]
 }
 
@@ -129,7 +129,7 @@ const SAMPLE_DIGEST: DigestEntry = {
   totalPapers: 9,
   emailStatus: 'sent',
   digestPreview: 'Weekly ArXiv Research Digest - Feb 17, 2025',
-  previewOnly: false,
+  dateRange: '2025-02-10 to 2025-02-17',
   papersByTopic: [
     {
       topic_name: 'Large Language Models',
@@ -234,7 +234,7 @@ const SAMPLE_HISTORY: DigestEntry[] = [
     totalPapers: 6,
     emailStatus: 'sent',
     digestPreview: 'Weekly ArXiv Research Digest - Feb 10, 2025',
-    previewOnly: false,
+    dateRange: '2025-02-03 to 2025-02-10',
     papersByTopic: [
       {
         topic_name: 'Large Language Models',
@@ -302,6 +302,23 @@ function formatDateTime(dateStr: string): string {
     return dateStr
   }
 }
+
+function toYMD(d: Date): string {
+  return d.toISOString().split('T')[0]
+}
+
+function getDefaultDateRange(): { from: string; to: string } {
+  const now = new Date()
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+  return { from: toYMD(weekAgo), to: toYMD(now) }
+}
+
+const DATE_RANGE_PRESETS: { label: string; days: number }[] = [
+  { label: 'Last 7 days', days: 7 },
+  { label: 'Last 14 days', days: 14 },
+  { label: 'Last 30 days', days: 30 },
+  { label: 'Last 3 months', days: 90 },
+]
 
 // ============================================================================
 // Markdown renderer
@@ -768,95 +785,53 @@ function DashboardSection({
 }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [previewData, setPreviewData] = useState<DigestEntry | null>(null)
-  const [sendingEmail, setSendingEmail] = useState(false)
-  const [emailSent, setEmailSent] = useState(false)
+  const [digestData, setDigestData] = useState<DigestEntry | null>(null)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
 
-  const displayTopics = sampleMode ? SAMPLE_TOPICS : topics
-  const displayPreview = sampleMode ? SAMPLE_DIGEST : previewData
+  // Date range state
+  const defaults = useMemo(() => getDefaultDateRange(), [])
+  const [dateFrom, setDateFrom] = useState(defaults.from)
+  const [dateTo, setDateTo] = useState(defaults.to)
 
-  const handleGeneratePreview = async () => {
+  const displayTopics = sampleMode ? SAMPLE_TOPICS : topics
+  const displayDigest = sampleMode ? SAMPLE_DIGEST : digestData
+
+  const applyPreset = (days: number) => {
+    const now = new Date()
+    const past = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+    setDateFrom(toYMD(past))
+    setDateTo(toYMD(now))
+  }
+
+  const handleFetchAndSend = async () => {
     if (displayTopics.length === 0) {
       setError('Add at least one research topic first.')
       return
     }
-    setLoading(true)
-    setError(null)
-    setPreviewData(null)
-    setEmailSent(false)
-    setStatusMessage(null)
-    setActiveAgentId(MANAGER_AGENT_ID)
-
-    try {
-      const message = JSON.stringify({
-        preview_only: true,
-        topics: displayTopics.map((t) => t.name),
-        recipient_email: settings.recipientEmail,
-        include_summaries: settings.includeSummaries,
-        include_key_insights: settings.includeKeyInsights,
-      })
-
-      const result = await callAIAgent(message, MANAGER_AGENT_ID)
-
-      if (result.success && result?.response?.result) {
-        const data = result.response.result
-        const papersByTopic = Array.isArray(data?.papers_by_topic) ? data.papers_by_topic : []
-
-        const entry: DigestEntry = {
-          id: generateId(),
-          date: new Date().toISOString(),
-          status: data?.status ?? 'completed',
-          topicsProcessed: data?.topics_processed ?? 0,
-          totalPapers: data?.total_papers ?? 0,
-          emailStatus: data?.email_status ?? 'preview',
-          digestPreview: data?.digest_preview ?? '',
-          previewOnly: true,
-          papersByTopic: papersByTopic.map((t: Record<string, unknown>) => ({
-            topic_name: (t?.topic_name as string) ?? 'Unknown Topic',
-            paper_count: (t?.paper_count as number) ?? 0,
-            papers: Array.isArray(t?.papers)
-              ? (t.papers as Record<string, unknown>[]).map((p) => ({
-                  title: (p?.title as string) ?? '',
-                  authors: (p?.authors as string) ?? '',
-                  published_date: (p?.published_date as string) ?? '',
-                  arxiv_link: (p?.arxiv_link as string) ?? '',
-                  summary: (p?.summary as string) ?? '',
-                  key_insights: Array.isArray(p?.key_insights) ? (p.key_insights as string[]) : [],
-                }))
-              : [],
-          })),
-        }
-
-        setPreviewData(entry)
-        setStatusMessage(`Preview generated: ${entry.totalPapers} papers across ${entry.topicsProcessed} topics`)
-      } else {
-        setError(result?.error ?? result?.response?.message ?? 'Failed to generate preview. Please try again.')
-      }
-    } catch (err) {
-      setError('An unexpected error occurred. Please try again.')
-    } finally {
-      setLoading(false)
-      setActiveAgentId(null)
-    }
-  }
-
-  const handleSendEmail = async () => {
-    if (displayTopics.length === 0) return
     if (!settings.recipientEmail) {
       setError('Please set a recipient email in Settings first.')
       return
     }
-    setSendingEmail(true)
+    if (!dateFrom || !dateTo) {
+      setError('Please select both a start and end date.')
+      return
+    }
+    if (new Date(dateFrom) > new Date(dateTo)) {
+      setError('Start date cannot be after end date.')
+      return
+    }
+    setLoading(true)
     setError(null)
+    setDigestData(null)
     setStatusMessage(null)
     setActiveAgentId(MANAGER_AGENT_ID)
 
     try {
       const message = JSON.stringify({
-        preview_only: false,
         topics: displayTopics.map((t) => t.name),
         recipient_email: settings.recipientEmail,
+        date_from: dateFrom,
+        date_to: dateTo,
         include_summaries: settings.includeSummaries,
         include_key_insights: settings.includeKeyInsights,
       })
@@ -875,7 +850,7 @@ function DashboardSection({
           totalPapers: data?.total_papers ?? 0,
           emailStatus: data?.email_status ?? 'sent',
           digestPreview: data?.digest_preview ?? '',
-          previewOnly: false,
+          dateRange: (data?.date_range as string) ?? `${dateFrom} to ${dateTo}`,
           papersByTopic: papersByTopic.map((t: Record<string, unknown>) => ({
             topic_name: (t?.topic_name as string) ?? 'Unknown Topic',
             paper_count: (t?.paper_count as number) ?? 0,
@@ -893,16 +868,15 @@ function DashboardSection({
         }
 
         onDigestGenerated(entry)
-        setPreviewData(entry)
-        setEmailSent(true)
-        setStatusMessage(`Digest sent to ${settings.recipientEmail} with ${entry.totalPapers} papers`)
+        setDigestData(entry)
+        setStatusMessage(`Digest sent to ${settings.recipientEmail} -- ${entry.totalPapers} papers across ${entry.topicsProcessed} topics (${dateFrom} to ${dateTo})`)
       } else {
-        setError(result?.error ?? result?.response?.message ?? 'Failed to send digest. Please try again.')
+        setError(result?.error ?? result?.response?.message ?? 'Failed to fetch and send digest. Please try again.')
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.')
     } finally {
-      setSendingEmail(false)
+      setLoading(false)
       setActiveAgentId(null)
     }
   }
@@ -945,14 +919,14 @@ function DashboardSection({
         )}
       </div>
 
-      {/* Right Column - Preview */}
+      {/* Right Column - Actions + Results */}
       <div className="lg:col-span-3 space-y-4">
-        {/* Countdown + Actions */}
+        {/* Countdown */}
         <GlassCard>
           <CardContent className="p-5">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <HiCalendarDays className="w-4 h-4 text-primary" />
+                <HiClock className="w-4 h-4 text-primary" />
               </div>
               <div>
                 <h3 className="font-semibold text-sm text-foreground">Next Scheduled Digest</h3>
@@ -960,35 +934,88 @@ function DashboardSection({
               </div>
             </div>
             <CountdownDisplay />
-            <div className="flex gap-2 mt-4">
-              <Button
-                className="flex-1 gap-1.5 shadow-sm"
-                onClick={handleGeneratePreview}
-                disabled={loading || displayTopics.length === 0}
-              >
-                {loading ? (
-                  <HiArrowPath className="w-4 h-4 animate-spin" />
-                ) : (
-                  <HiEye className="w-4 h-4" />
-                )}
-                {loading ? 'Generating...' : 'Generate Preview'}
-              </Button>
-              <Button
-                variant="outline"
-                className="gap-1.5"
-                onClick={handleSendEmail}
-                disabled={sendingEmail || loading || displayTopics.length === 0}
-              >
-                {sendingEmail ? (
-                  <HiArrowPath className="w-4 h-4 animate-spin" />
-                ) : emailSent ? (
-                  <HiCheck className="w-4 h-4 text-green-600" />
-                ) : (
-                  <HiPaperAirplane className="w-4 h-4" />
-                )}
-                {sendingEmail ? 'Sending...' : emailSent ? 'Sent' : 'Send Now'}
-              </Button>
+          </CardContent>
+        </GlassCard>
+
+        {/* Date Range Selection + Trigger */}
+        <GlassCard>
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center">
+                <HiCalendarDays className="w-4 h-4 text-accent-foreground" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-sm text-foreground">Paper Date Range</h3>
+                <p className="text-[11px] text-muted-foreground">Select the date window for ArXiv paper search</p>
+              </div>
             </div>
+
+            {/* Preset Buttons */}
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {DATE_RANGE_PRESETS.map((preset) => {
+                const presetTo = new Date()
+                const presetFrom = new Date(presetTo.getTime() - preset.days * 24 * 60 * 60 * 1000)
+                const isActive = dateFrom === toYMD(presetFrom) && dateTo === toYMD(presetTo)
+                return (
+                  <button
+                    key={preset.days}
+                    onClick={() => applyPreset(preset.days)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-secondary/60 text-secondary-foreground hover:bg-secondary'}`}
+                  >
+                    {preset.label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Custom Date Inputs */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="date-from" className="text-xs text-muted-foreground">From</Label>
+                <Input
+                  id="date-from"
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="text-sm h-9"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="date-to" className="text-xs text-muted-foreground">To</Label>
+                <Input
+                  id="date-to"
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="text-sm h-9"
+                />
+              </div>
+            </div>
+
+            {/* Selected range display */}
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-secondary/30 mb-4">
+              <HiCalendarDays className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+              <span className="text-xs text-muted-foreground">
+                Searching papers from <span className="font-medium text-foreground">{formatDate(dateFrom)}</span> to <span className="font-medium text-foreground">{formatDate(dateTo)}</span>
+              </span>
+            </div>
+
+            {/* Action Button */}
+            <Button
+              className="w-full gap-2 shadow-sm h-10"
+              onClick={handleFetchAndSend}
+              disabled={loading || displayTopics.length === 0}
+            >
+              {loading ? (
+                <HiArrowPath className="w-4 h-4 animate-spin" />
+              ) : (
+                <HiPaperAirplane className="w-4 h-4" />
+              )}
+              {loading ? 'Searching ArXiv & sending email...' : 'Fetch Papers & Send Digest'}
+            </Button>
+            <p className="text-[10px] text-muted-foreground mt-2 text-center">
+              This will search ArXiv for papers in the selected date range and send the digest email to {settings.recipientEmail || '(no email set)'}
+            </p>
           </CardContent>
         </GlassCard>
 
@@ -1013,6 +1040,10 @@ function DashboardSection({
         {loading && (
           <GlassCard>
             <CardContent className="p-5 space-y-4">
+              <div className="flex items-center gap-3 mb-1">
+                <HiArrowPath className="w-4 h-4 text-primary animate-spin flex-shrink-0" />
+                <p className="text-sm font-medium text-foreground">Fetching papers from ArXiv and composing email...</p>
+              </div>
               <div className="flex items-center gap-3">
                 <Skeleton className="w-8 h-8 rounded-lg" />
                 <div className="space-y-2 flex-1">
@@ -1035,33 +1066,39 @@ function DashboardSection({
           </GlassCard>
         )}
 
-        {/* Preview Results */}
-        {displayPreview && !loading && (
+        {/* Digest Results */}
+        {displayDigest && !loading && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-base text-foreground">Digest Preview</h3>
+              <h3 className="font-bold text-base text-foreground">Digest Results</h3>
               <div className="flex items-center gap-2">
+                {displayDigest.dateRange && (
+                  <Badge variant="outline" className="text-[10px]">
+                    <HiCalendarDays className="w-3 h-3 mr-1" />
+                    {displayDigest.dateRange}
+                  </Badge>
+                )}
                 <Badge variant="secondary" className="text-xs">
                   <HiDocumentText className="w-3 h-3 mr-1" />
-                  {displayPreview.totalPapers} papers
+                  {displayDigest.totalPapers} papers
                 </Badge>
-                <Badge variant={displayPreview.emailStatus === 'sent' ? 'default' : 'outline'} className="text-xs">
+                <Badge variant="default" className="text-xs">
                   <HiEnvelope className="w-3 h-3 mr-1" />
-                  {displayPreview.emailStatus}
+                  {displayDigest.emailStatus}
                 </Badge>
               </div>
             </div>
 
-            {displayPreview.digestPreview && (
+            {displayDigest.digestPreview && (
               <GlassCard>
                 <CardContent className="p-4">
-                  <div className="text-sm text-muted-foreground">{renderMarkdown(displayPreview.digestPreview)}</div>
+                  <div className="text-sm text-muted-foreground">{renderMarkdown(displayDigest.digestPreview)}</div>
                 </CardContent>
               </GlassCard>
             )}
 
-            {Array.isArray(displayPreview.papersByTopic) &&
-              displayPreview.papersByTopic.map((topicGroup, idx) => (
+            {Array.isArray(displayDigest.papersByTopic) &&
+              displayDigest.papersByTopic.map((topicGroup, idx) => (
                 <div key={idx} className="space-y-2">
                   <div className="flex items-center gap-2 mt-2">
                     <Badge className="text-xs px-2.5 py-0.5">{topicGroup?.topic_name ?? 'Unknown'}</Badge>
@@ -1076,16 +1113,16 @@ function DashboardSection({
           </div>
         )}
 
-        {/* Empty preview state */}
-        {!displayPreview && !loading && (
+        {/* Empty state */}
+        {!displayDigest && !loading && (
           <GlassCard>
             <CardContent className="py-16 text-center">
               <div className="w-14 h-14 rounded-2xl bg-accent/20 flex items-center justify-center mx-auto mb-4">
                 <HiBookOpen className="w-7 h-7 text-accent-foreground" />
               </div>
-              <h3 className="font-semibold text-foreground mb-1">No preview yet</h3>
+              <h3 className="font-semibold text-foreground mb-1">No digest yet</h3>
               <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                Click "Generate Preview" to fetch the latest arXiv papers for your topics and see a digest preview.
+                Select a date range and click "Fetch Papers & Send Digest" to search ArXiv and receive your digest email.
               </p>
             </CardContent>
           </GlassCard>
@@ -1172,6 +1209,12 @@ function DigestHistorySection({
                       <p className="text-xs text-muted-foreground truncate">{entry?.digestPreview ?? 'Research digest'}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      {entry?.dateRange && (
+                        <Badge variant="outline" className="text-[10px]">
+                          <HiCalendarDays className="w-3 h-3 mr-0.5" />
+                          {entry.dateRange}
+                        </Badge>
+                      )}
                       <Badge variant="secondary" className="text-[10px]">
                         {entry?.topicsProcessed ?? 0} topics
                       </Badge>
