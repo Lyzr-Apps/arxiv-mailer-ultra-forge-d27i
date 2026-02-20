@@ -255,6 +255,39 @@ const SAMPLE_HISTORY: DigestEntry[] = [
 ]
 
 // ============================================================================
+// Suggested Topics (pre-written with ArXiv-friendly keywords)
+// ============================================================================
+
+interface SuggestedTopic {
+  name: string
+  keywords: string
+  category: string
+}
+
+const SUGGESTED_TOPICS: SuggestedTopic[] = [
+  { name: 'Large Language Models', keywords: 'large language model, LLM, GPT, transformer, instruction tuning, in-context learning', category: 'NLP' },
+  { name: 'Reinforcement Learning', keywords: 'reinforcement learning, policy gradient, reward shaping, RLHF, Q-learning, PPO', category: 'ML' },
+  { name: 'Computer Vision', keywords: 'computer vision, image recognition, object detection, visual transformer, ViT', category: 'CV' },
+  { name: 'Diffusion Models', keywords: 'diffusion model, denoising diffusion, DDPM, score matching, stable diffusion, image generation', category: 'Generative' },
+  { name: 'Graph Neural Networks', keywords: 'graph neural network, GNN, message passing, node classification, graph transformer', category: 'ML' },
+  { name: 'Multi-Agent Systems', keywords: 'multi-agent, cooperative agents, agent communication, multi-agent reinforcement learning', category: 'AI' },
+  { name: 'AI Safety & Alignment', keywords: 'AI safety, alignment, RLHF, constitutional AI, value alignment, safe AI, red teaming', category: 'AI' },
+  { name: 'Federated Learning', keywords: 'federated learning, distributed learning, privacy preserving, differential privacy', category: 'ML' },
+  { name: 'Natural Language Processing', keywords: 'natural language processing, NLP, text classification, sentiment analysis, named entity recognition, parsing', category: 'NLP' },
+  { name: 'Robotics & Control', keywords: 'robotics, robot learning, manipulation, locomotion, sim-to-real, motion planning', category: 'Robotics' },
+  { name: 'Speech & Audio', keywords: 'speech recognition, automatic speech recognition, ASR, text-to-speech, TTS, audio processing', category: 'Audio' },
+  { name: 'Knowledge Graphs', keywords: 'knowledge graph, knowledge representation, entity relation, knowledge base, link prediction', category: 'NLP' },
+  { name: 'Neural Architecture Search', keywords: 'neural architecture search, NAS, AutoML, architecture optimization, efficient neural networks', category: 'ML' },
+  { name: 'Quantum Machine Learning', keywords: 'quantum computing, quantum machine learning, quantum algorithm, variational quantum, qubit', category: 'Quantum' },
+  { name: 'Medical AI', keywords: 'medical imaging, clinical NLP, drug discovery, biomedical, healthcare AI, radiology AI', category: 'Healthcare' },
+  { name: 'Autonomous Driving', keywords: 'autonomous driving, self-driving, lidar, point cloud, trajectory prediction, vehicle detection', category: 'CV' },
+  { name: 'Retrieval-Augmented Generation', keywords: 'retrieval augmented generation, RAG, dense retrieval, semantic search, vector database', category: 'NLP' },
+  { name: 'Code Generation', keywords: 'code generation, program synthesis, code completion, automated programming, code LLM', category: 'NLP' },
+  { name: 'Multimodal Learning', keywords: 'multimodal, vision-language, CLIP, visual question answering, image-text, cross-modal', category: 'ML' },
+  { name: 'Time Series & Forecasting', keywords: 'time series, forecasting, temporal, sequence prediction, anomaly detection, temporal modeling', category: 'ML' },
+]
+
+// ============================================================================
 // Helpers
 // ============================================================================
 
@@ -764,6 +797,120 @@ function AddTopicDialog({ onAdd }: { onAdd: (name: string, keywords: string) => 
 // Dashboard Section
 // ============================================================================
 
+// ============================================================================
+// Suggested Topics Section
+// ============================================================================
+
+function SuggestedTopicsSection({
+  existingTopics,
+  onAddTopic,
+}: {
+  existingTopics: ResearchTopic[]
+  onAddTopic: (name: string, keywords: string) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+
+  const existingNames = useMemo(
+    () => new Set(existingTopics.map((t) => t.name.toLowerCase())),
+    [existingTopics]
+  )
+
+  const categories = useMemo(() => {
+    const cats = new Set(SUGGESTED_TOPICS.map((t) => t.category))
+    return Array.from(cats).sort()
+  }, [])
+
+  const filteredSuggestions = useMemo(() => {
+    let topics = SUGGESTED_TOPICS.filter((t) => !existingNames.has(t.name.toLowerCase()))
+    if (selectedCategory) {
+      topics = topics.filter((t) => t.category === selectedCategory)
+    }
+    return topics
+  }, [existingNames, selectedCategory])
+
+  const displayedSuggestions = expanded ? filteredSuggestions : filteredSuggestions.slice(0, 6)
+
+  if (filteredSuggestions.length === 0 && !selectedCategory) return null
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <HiLightBulb className="w-4 h-4 text-amber-500" />
+          <h3 className="text-sm font-semibold text-foreground">Suggested Topics</h3>
+        </div>
+        <span className="text-[10px] text-muted-foreground">{filteredSuggestions.length} available</span>
+      </div>
+
+      {/* Category Filters */}
+      <div className="flex flex-wrap gap-1">
+        <button
+          onClick={() => setSelectedCategory(null)}
+          className={`px-2 py-1 rounded-md text-[10px] font-medium transition-all ${!selectedCategory ? 'bg-primary text-primary-foreground' : 'bg-secondary/60 text-muted-foreground hover:bg-secondary'}`}
+        >
+          All
+        </button>
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+            className={`px-2 py-1 rounded-md text-[10px] font-medium transition-all ${selectedCategory === cat ? 'bg-primary text-primary-foreground' : 'bg-secondary/60 text-muted-foreground hover:bg-secondary'}`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {/* Topic Chips */}
+      <div className="flex flex-wrap gap-1.5">
+        {displayedSuggestions.map((topic) => (
+          <button
+            key={topic.name}
+            onClick={() => onAddTopic(topic.name, topic.keywords)}
+            className="group inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-secondary/50 hover:bg-primary/10 border border-transparent hover:border-primary/20 text-xs text-foreground transition-all duration-200"
+            title={`Keywords: ${topic.keywords}`}
+          >
+            <HiPlus className="w-3 h-3 text-muted-foreground group-hover:text-primary transition-colors" />
+            <span>{topic.name}</span>
+            <Badge variant="outline" className="text-[8px] px-1 py-0 ml-0.5 border-muted-foreground/30">
+              {topic.category}
+            </Badge>
+          </button>
+        ))}
+      </div>
+
+      {/* Show more / less */}
+      {filteredSuggestions.length > 6 && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+        >
+          {expanded ? (
+            <>
+              <HiChevronDown className="w-3 h-3" />
+              Show less
+            </>
+          ) : (
+            <>
+              <HiChevronRight className="w-3 h-3" />
+              Show all {filteredSuggestions.length} topics
+            </>
+          )}
+        </button>
+      )}
+
+      <p className="text-[10px] text-muted-foreground">
+        Click a topic to add it with pre-configured ArXiv search keywords.
+      </p>
+    </div>
+  )
+}
+
+// ============================================================================
+// Dashboard Section
+// ============================================================================
+
 function DashboardSection({
   topics,
   onAddTopic,
@@ -828,7 +975,10 @@ function DashboardSection({
 
     try {
       const message = JSON.stringify({
-        topics: displayTopics.map((t) => t.name),
+        topics: displayTopics.map((t) => ({
+          name: t.name,
+          keywords: t.keywords,
+        })),
         recipient_email: settings.recipientEmail,
         date_from: dateFrom,
         date_to: dateTo,
@@ -900,13 +1050,13 @@ function DashboardSection({
                 <HiBeaker className="w-6 h-6 text-primary" />
               </div>
               <h3 className="font-semibold text-foreground mb-1">No topics yet</h3>
-              <p className="text-sm text-muted-foreground mb-4">Add your first research topic to start monitoring arXiv papers.</p>
+              <p className="text-sm text-muted-foreground mb-4">Add a research topic or pick from the suggestions below to start monitoring arXiv papers.</p>
               <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                <span>Click</span>
+                <span>Use</span>
                 <Badge variant="secondary" className="text-[10px] px-1.5">
                   <HiPlus className="w-3 h-3 mr-0.5" /> Add Topic
                 </Badge>
-                <span>above to get started</span>
+                <span>or pick a suggested topic below</span>
               </div>
             </CardContent>
           </GlassCard>
@@ -916,6 +1066,14 @@ function DashboardSection({
               <TopicCard key={topic.id} topic={topic} onRemove={onRemoveTopic} />
             ))}
           </div>
+        )}
+
+        {/* Suggested Topics */}
+        {!sampleMode && (
+          <SuggestedTopicsSection
+            existingTopics={topics}
+            onAddTopic={onAddTopic}
+          />
         )}
       </div>
 
